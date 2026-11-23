@@ -64,7 +64,7 @@ const send = (ch, ...a) => { if (win && !win.isDestroyed()) win.webContents.send
 const snapshot = () => ({ payments: state.payments, people: state.people, offline: state.offline, error: state.error, pending: outbox.length });
 const emitData = () => { if (!locked) send('data', snapshot()); };
 const publicState = () => ({
-  user: publicUser(), locked, pinEnabled: pinEnabled(), needsSecret: !getSecret(), version: app.getVersion()
+  user: publicUser(), locked, pinEnabled: pinEnabled(), needsSecret: !cfg.authPage && !getSecret(), version: app.getVersion()
 });
 
 function persist() {
@@ -218,37 +218,40 @@ function resultPage(ok) {
 }
 
 async function googleLogin() {
-  const secret = getSecret();
-  if (!secret) return { error: 'NEED_SECRET' };
+  const usePage = !!cfg.authPage;
+  const secret = usePage ? '' : getSecret();
+  if (!usePage && !secret) return { error: 'NEED_SECRET' };
   if (loginCtl) return { error: 'BUSY' };
   const verifier = b64u(crypto.randomBytes(48));
   const challenge = b64u(crypto.createHash('sha256').update(verifier).digest());
   const st = b64u(crypto.randomBytes(16));
-  const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
-    client_id: cfg.google.clientId, redirect_uri: REDIRECT, response_type: 'code',
-    scope: 'openid email profile', code_challenge: challenge, code_challenge_method: 'S256',
-    state: st, prompt: 'select_account'
-  });
-  let code;
+  const field = usePage ? 'id_token' : 'code';
+  const url = usePage
+    ? `${cfg.authPage}${cfg.authPage.includes('?') ? '&' : '?'}port=${REDIRECT_PORT}&state=${st}`
+    : 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+      client_id: cfg.google.clientId, redirect_uri: REDIRECT, response_type: 'code',
+      scope: 'openid email profile', code_challenge: challenge, code_challenge_method: 'S256',
+      state: st, prompt: 'select_account'
+    });
+  let value;
   try {
-    code = await new Promise((resolve, reject) => {
+    value = await new Promise((resolve, reject) => {
       let finished = false;
       const srv = http.createServer((req, res) => {
         const u = new URL(req.url, `http://127.0.0.1:${REDIRECT_PORT}`);
         if (u.pathname !== '/callback') { res.writeHead(404); res.end(); return; }
-        const okState = u.searchParams.get('state') === st;
-        const c = u.searchParams.get('code');
-        const good = okState && !!c;
+        const v = u.searchParams.get(field);
+        const good = u.searchParams.get('state') === st && !!v && !u.searchParams.get('error');
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
         res.end(resultPage(good));
-        finish(good ? null : new Error(u.searchParams.get('error') === 'access_denied' ? 'DENIED' : 'ERROR'), c);
+        finish(good ? null : new Error(u.searchParams.get('error') === 'access_denied' ? 'DENIED' : 'ERROR'), v);
       });
       const timer = setTimeout(() => finish(new Error('TIMEOUT')), 180000);
-      function finish(err, value) {
+      function finish(err, v) {
         if (finished) return;
         finished = true; clearTimeout(timer);
         try { srv.close(); } catch (e) { /* ignore */ }
-        if (err) reject(err); else resolve(value);
+        if (err) reject(err); else resolve(v);
       }
       loginCtl = { cancel: () => finish(new Error('CANCELED')) };
       srv.on('error', () => finish(new Error('PORT_BUSY')));
@@ -261,17 +264,21 @@ async function googleLogin() {
   loginCtl = null;
 
   try {
-    const tok = await jfetch('https://oauth2.googleapis.com/token', {
-      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code, client_id: cfg.google.clientId, client_secret: secret,
-        redirect_uri: REDIRECT, grant_type: 'authorization_code', code_verifier: verifier
-      })
-    });
+    let googleIdToken = value;
+    if (!usePage) {
+      const tok = await jfetch('https://oauth2.googleapis.com/token', {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code: value, client_id: cfg.google.clientId, client_secret: secret,
+          redirect_uri: REDIRECT, grant_type: 'authorization_code', code_verifier: verifier
+        })
+      });
+      googleIdToken = tok.id_token;
+    }
     const fb = await jfetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${cfg.firebase.apiKey}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        postBody: `id_token=${tok.id_token}&providerId=google.com`,
+        postBody: `id_token=${encodeURIComponent(googleIdToken)}&providerId=google.com`,
         requestUri: 'http://localhost', returnIdpCredential: true, returnSecureToken: true
       })
     });

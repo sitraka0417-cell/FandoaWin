@@ -241,3 +241,5 @@ textarea { resize: vertical; min-height: 4.5rem; max-height: 14rem; }
 .zoomctl { display: flex; align-items: center; gap: 8px; }
 .zoomctl span { min-width: 3.4rem; text-align: center; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+[hidden] { display: none !important; }

@@ -6,5 +6,6 @@
   "google": {
     "clientId": "223584939365-jmqr69scqjmuc2se2s9qapdqqpm66ruu.apps.googleusercontent.com",
     "clientSecret": ""
-  }
+  },
+  "authPage": "https://sitraka0417-cell.github.io/FandoaWin/"
 }
