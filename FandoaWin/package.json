@@ -1,0 +1,41 @@
+{
+  "name": "fandoa-windows",
+  "version": "1.0.0",
+  "description": "Fandoa - suivi des salaires et des paiements",
+  "main": "main.js",
+  "author": "Sitraka Nambinintsoa",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node scripts/test-model.js && node scripts/smoke-ui.js",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "devDependencies": {
+    "electron": "^31.3.1",
+    "electron-builder": "24.13.3"
+  },
+  "build": {
+    "appId": "mg.sitraka.fandoa.windows",
+    "productName": "Fandoa",
+    "copyright": "Sitraka Nambinintsoa",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js", "config.json", "src/**/*", "assets/**/*"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Fandoa",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "language": "1036",
+      "artifactName": "Fandoa-Setup-${version}.exe"
+    }
+  }
+}

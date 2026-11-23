@@ -1,0 +1,10 @@
+{
+  "firebase": {
+    "projectId": "fandoa-1a628",
+    "apiKey": "AIzaSyB4iBgSXVFKQQ77jHohVQw59VbPO2aHaEo"
+  },
+  "google": {
+    "clientId": "223584939365-jmqr69scqjmuc2se2s9qapdqqpm66ruu.apps.googleusercontent.com",
+    "clientSecret": ""
+  }
+}

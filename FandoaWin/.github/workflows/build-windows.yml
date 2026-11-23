@@ -1,0 +1,28 @@
+name: Build installateur Windows
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Installer les dépendances
+        run: npm install --no-audit --no-fund
+      - name: Tests
+        run: npm test
+      - name: Version automatique
+        run: npm pkg set version=1.0.${{ github.run_number }}
+      - name: Client secret Google
+        run: node scripts/inject-secret.js
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      - name: Construire l'installateur
+        run: npx electron-builder --win nsis --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fandoa-Windows-Setup
+          path: dist/Fandoa-Setup-*.exe
