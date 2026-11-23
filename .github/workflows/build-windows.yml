@@ -1,28 +1,60 @@
 name: Build installateur Windows
+
 on:
   push:
   workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - name: Installer les dépendances
         run: npm install --no-audit --no-fund
+
       - name: Tests
         run: npm test
+
       - name: Version automatique
         run: npm pkg set version=1.0.${{ github.run_number }}
+
       - name: Client secret Google
         run: node scripts/inject-secret.js
         env:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+
       - name: Construire l'installateur
         run: npx electron-builder --win nsis --publish never
-      - uses: actions/upload-artifact@v4
+
+      - name: Préparer le téléchargement direct
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem dist -Filter "Fandoa-Setup-*.exe" | Select-Object -First 1
+          if (-not $setup) {
+            throw "Installateur Windows introuvable dans dist"
+          }
+          Copy-Item $setup.FullName "dist/FandoaWin-Setup.exe"
+
+      - name: Sauvegarder Artifact
+        uses: actions/upload-artifact@v4
         with:
           name: Fandoa-Windows-Setup
           path: dist/Fandoa-Setup-*.exe
+
+      - name: Publier GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: FandoaWin v1.0.${{ github.run_number }}
+          generate_release_notes: true
+          files: dist/FandoaWin-Setup.exe
+          fail_on_unmatched_files: true
